@@ -1,0 +1,178 @@
+# Builds the Qt Help (.qch) archive and checks it.
+#
+# Unlike the cppreference package this one is modelled on, there is nothing to
+# carry between runs: Oracle publishes the documentation as one zip and serves
+# it in a few seconds, so every run fetches it fresh.  Which release it builds
+# is `JDK_VERSION` in the Makefile, or whatever a manual run asks for.
+#
+# What it does not do by default is hand the archive to anybody.  Oracle's
+# Documentation Redistribution Policy says the Java SE API Specification "is
+# not redistributable", that it may be redistributed internally but "cannot be
+# made available on the Internet", and that permission to publish it in a
+# format of the kind this builds -- it names WinHelp and HTMLHelp -- is given
+# "on a case-by-case basis".  An artifact on a public repository and a release
+# asset are both the Internet.  So the upload steps are off unless the
+# repository variable PUBLISH_QCH is set to `true`, which is for whoever has
+# asked Oracle and been told yes.  See the README.
+#
+# Everything up to and including the check runs either way, which is what
+# makes this worth having: it proves the build still works against whatever
+# Oracle published this week.
+
+name: Qt Help archive
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      jdk_version:
+        description: 'The feature release of the JDK to build (blank = the one in the Makefile)'
+        type: string
+        default: ''
+
+# A run that has been superseded is of no interest; a tag builds on its own.
+concurrency:
+  group: qch-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: write      # the publishing step attaches the archives
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-ci.txt
+
+      - name: Install the Python dependencies
+        run: pip install -r requirements.txt -r requirements-ci.txt
+
+      - name: Install qhelpgenerator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qt6-documentation-tools
+          # Qt keeps it out of the way under /usr/lib/qt6/libexec, and the
+          # package is free to move it, so ask dpkg where it landed.
+          qhg=$(dpkg -L qt6-documentation-tools | grep -E '/qhelpgenerator$' | head -1)
+          test -x "$qhg" || { echo "::error::qhelpgenerator not found"; exit 1; }
+          echo "QHELPGENERATOR=$qhg" >> "$GITHUB_ENV"
+
+      - name: Work out which release to build
+        env:
+          ASKED_FOR: ${{ inputs.jdk_version }}
+        run: |
+          version="${ASKED_FOR:-$(sed -n 's/^JDK_VERSION *= *//p' Makefile)}"
+          test -n "$version" || { echo "::error::no JDK_VERSION in the Makefile"; exit 1; }
+          echo "JDK_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Building the documentation of JDK $version"
+
+      - name: Check the style and run the tests
+        run: make check
+
+      - name: Fetch the documentation
+        run: make source JDK_VERSION="$JDK_VERSION"
+
+      - name: Work out the version the bundle holds
+        run: |
+          # `fetch_docs.py` leaves the update release behind -- 25.0.4 for a
+          # 25 -- which is what the archives are named after.
+          release=$(cat reference/RELEASE)
+          test -n "$release" || release="$JDK_VERSION"
+          echo "VERSION=$release" >> "$GITHUB_ENV"
+
+          # A tag that disagrees would publish archives whose names do not
+          # match the release they hang under.
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$release" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match the $release bundle that was fetched"
+            exit 1
+          fi
+
+      - name: Build the archive
+        run: make doc_qch JDK_VERSION="$JDK_VERSION" qhelpgenerator="$QHELPGENERATOR"
+
+      - name: Check the archive
+        # The .qch is a SQLite database, so it can say for itself whether the
+        # pages, the images, the index and both stylesheets arrived in it.
+        env:
+          JDK_VERSION: ${{ env.JDK_VERSION }}
+        run: |
+          python - <<'EOF'
+          import os
+          import sqlite3
+          import sys
+
+          path = 'output/openjdk-doc-en-java%s.qch' % os.environ['JDK_VERSION']
+          db = sqlite3.connect(path)
+
+          files, = db.execute('select count(*) from FileNameTable').fetchone()
+          keywords, = db.execute('select count(*) from IndexTable').fetchone()
+          images, = db.execute(
+              "select count(*) from FileNameTable where Name like '%.svg'"
+              " or Name like '%.png' or Name like '%.gif'").fetchone()
+          sheets = sorted(name for (name,) in db.execute(
+              "select Name from FileNameTable where Name like '%/offline%'"))
+
+          print('files: %d, keywords: %d, images: %d' % (files, keywords,
+                                                         images))
+          print('stylesheets: %s' % ', '.join(sheets))
+
+          if files < 9000:
+              sys.exit('only %d files in the archive' % files)
+          if keywords < 40000:
+              sys.exit('only %d keywords in the archive' % keywords)
+          if images < 100:
+              sys.exit('only %d images in the archive' % images)
+          if len(sheets) != 6:
+              sys.exit('expected six stylesheets, found %d' % len(sheets))
+          EOF
+
+      - name: Say why nothing is being uploaded
+        if: vars.PUBLISH_QCH != 'true'
+        run: |
+          echo "::notice::Built and checked. Nothing is uploaded: Oracle's" \
+            "documentation redistribution policy does not allow the Java SE" \
+            "API Specification to be made available on the Internet without" \
+            "permission granted case by case. Set the repository variable" \
+            "PUBLISH_QCH to 'true' once you have it."
+
+      # Handed this, GitHub zips whatever it is given and serves the result
+      # under the artifact's name, so it gets the .qch itself rather than the
+      # release archives: those would come down as a zip holding an archive
+      # holding the one file anybody wanted, compressed twice over.
+      - uses: actions/upload-artifact@v4
+        if: vars.PUBLISH_QCH == 'true'
+        with:
+          name: openjdk-doc-en-java${{ env.JDK_VERSION }}-${{ env.VERSION }}
+          path: output/openjdk-doc-en-java${{ env.JDK_VERSION }}.qch
+          if-no-files-found: error
+
+      - name: Package it as the release archives
+        if: github.ref_type == 'tag' && vars.PUBLISH_QCH == 'true'
+        run: make release JDK_VERSION="$JDK_VERSION" qhelpgenerator="$QHELPGENERATOR"
+
+      - name: Publish the release
+        if: github.ref_type == 'tag' && vars.PUBLISH_QCH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            # a release made by hand, or an earlier run of this workflow
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --clobber release/*
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" --generate-notes \
+              release/*
+          fi

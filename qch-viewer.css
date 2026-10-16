@@ -1,0 +1,137 @@
+/* What fits the generated pages to a help pane.
+ *
+ * Read by "commands/qch_css.py" and folded into both of the stylesheets it
+ * writes.  The ":root" block sets the custom properties javadoc's own sheet
+ * is resolved against; the rules after it are appended to the end of the
+ * sheet, where they outrank everything the bundle came with.
+ */
+
+:root {
+    /* The fonts are the reader's.  litehtml hands a font-family list to the
+     * help viewer, which hands it to QFont, and QFont resolves the first
+     * name and substitutes its own default when that one is not installed
+     * rather than trying the next -- so naming DejaVu, which hardly anyone
+     * outside Linux has, would lose the font everywhere else.  What can be
+     * counted on is the generic families, which qlitehtml answers with faces
+     * of its own, and `inherit`, which is the font chosen for the pane. */
+    --body-font-family: inherit;
+    --block-font-family: inherit;
+    --code-font-family: monospace;
+
+    /* javadoc sizes the page against a browser's 16px default and states
+     * the result in pixels.  A help pane starts from the font size the
+     * reader chose for it, so the four base sizes become proportions of
+     * that, and the page follows the pane.
+     *
+     * The code font is asked for at less than its nominal size because
+     * Courier, which is what a help viewer gives us for `monospace`, draws
+     * larger than the proportional face beside it: a type name in the
+     * middle of a sentence would otherwise stand up out of the line. */
+    --body-font-size: 1em;
+    --block-font-size: 1em;
+    --code-font-size: 0.85em;
+    --nav-font-size: 0.95em;
+
+    /* The navigation bars the pages reserved room for are not on them any
+     * more, and neither is the column the content was centred in: a help
+     * pane is narrow enough already. */
+    --top-nav-height: 0px;
+    --sub-nav-height: 0px;
+    --nav-height: 0px;
+    --max-content-width: none;
+    --content-margin: 0;
+}
+
+/* litehtml lays an element it does not know out inline, and the pages are
+ * built out of HTML5 sectioning elements throughout. */
+main, section, article, aside, nav, header, footer,
+figure, figcaption, details, summary, hgroup {
+    display: block;
+}
+
+body {
+    padding: 0 14px 24px;
+}
+
+/* The breadcrumb, lifted out of the navigation bar and put at the top of the
+ * content: `java.base`, then `java.lang`, then the class. */
+ol.sub-nav-list {
+    margin: 0 0 14px;
+    padding: 0;
+    font-size: var(--nav-font-size);
+}
+
+ol.sub-nav-list li {
+    display: inline;
+    list-style: none;
+}
+
+ol.sub-nav-list li + li::before {
+    content: " / ";
+}
+
+/* The summary tables, which `commands/qch_html.py` has rebuilt out of the
+ * run of <div>s that javadoc lays out with `grid-template-columns`.  What
+ * styled them was `.summary-table > div`, which no longer matches, so the
+ * padding and the measure of a cell are restated here. */
+table.summary-table,
+table.details-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+table.summary-table th,
+table.summary-table td,
+table.details-table th,
+table.details-table td {
+    font-size: var(--nav-font-size);
+    line-height: 1.6;
+    padding: 7px 8px 6px;
+    text-align: left;
+    vertical-align: top;
+}
+
+table.summary-table th,
+table.details-table th {
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* The first column holds a signature and the last a sentence about it, so
+ * the table reads best when the description is given whatever is left. */
+table.summary-table td.col-last,
+table.details-table td.col-last {
+    width: 100%;
+}
+
+/* The monospace correction belongs to the face and not to the text, so it is
+ * taken once where the monospace starts.  A <code> inside a <pre> inside a
+ * cell that is already in the code font is three deep, and asking for 85% at
+ * each step would compound to 61%. */
+code code, code pre, pre code, pre pre,
+.code-font code, .code-font pre {
+    font-size: 100%;
+}
+
+/* `overflow: auto` is a scroll container, which litehtml cannot scroll: the
+ * content is simply cut off at the edge of the box.  These are all wrappers
+ * javadoc put around something that might be wider than the window, and on a
+ * page nobody can scroll sideways it is better that they run on. */
+div.horizontal-scroll,
+div.caption,
+.col-first, .col-second, .col-last, .col-constructor-name {
+    overflow: visible;
+}
+
+/* The manual pages and the specifications, which carry a stylesheet of their
+ * own that assumes a browser's default page width and margins. */
+body > header#title-block-header > *,
+:is(body, header) > :is(nav, h1, h2, h3, h4, h5, h6, p, .sub-title) {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+main, footer {
+    margin: 0;
+}

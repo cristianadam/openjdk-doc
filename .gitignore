@@ -1,0 +1,7 @@
+output/
+reference/
+release/
+venv/
+__pycache__/
+*.pyc
+*.qch

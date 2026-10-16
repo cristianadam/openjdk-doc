@@ -1,0 +1,141 @@
+/* The dark palette.
+ *
+ * Read by "commands/qch_css.py", which resolves javadoc's stylesheet against
+ * these values instead of its own and writes the result as
+ * "offline-dark.css".  Qt Assistant and Qt Creator serve that file in place
+ * of the light one when their own theme is dark.
+ *
+ * The page colors are the ones Qt Creator falls back to for documentation
+ * that ships no dark variant, so that the Java pages sit well next to the Qt
+ * pages in the same help pane.
+ *
+ * javadoc declares every color it uses as a custom property, so the ":root"
+ * block below is the whole of the dark scheme for the API documentation.
+ * The rules after it are for the specifications and the manual pages, whose
+ * stylesheet predates the custom properties and states its colors outright.
+ */
+
+:root {
+    /* Text */
+    --body-text-color: #d0d0d0;
+    --block-text-color: #d0d0d0;
+    --title-color: #9fc3dd;
+
+    /* Backgrounds */
+    --body-background-color: #262626;
+    --section-background-color: #262626;
+    --detail-background-color: #2b2b2b;
+    --detail-block-color: #2e2e2e;
+    --code-background-color: #303030;
+    --mark-background-color: #333333;
+
+    /* Links */
+    --link-color: #6ab0f3;
+    --link-color-active: #e0a861;
+
+    /* The navigation bars and the headings that borrow their colors */
+    --navbar-background-color: #35506b;
+    --navbar-text-color: #e8e8e8;
+    --subnav-background-color: #33414e;
+    --subnav-link-color: #8ab4d8;
+    --member-heading-background-color: #33414e;
+
+    /* Selected tabs and navigation items */
+    --selected-background-color: #b4761a;
+    --selected-text-color: #f0f0f0;
+    --selected-link-color: #9cc0e0;
+
+    /* Generated tables.  The two row colors have to stay a step apart or the
+     * summary tables lose their shape. */
+    --table-header-color: #323c46;
+    --even-row-color: #262626;
+    --odd-row-color: #2d2d2d;
+
+    /* Table of contents */
+    --toc-background-color: #2a2a2a;
+    --toc-highlight-color: #33414e;
+    --toc-hover-color: #303030;
+
+    /* Snippets and preformatted blocks */
+    --snippet-background-color: #2e2e30;
+    --snippet-text-color: #d0d0d0;
+    --snippet-highlight-color: #6b4a1f;
+    --pre-background-color: #2e2e30;
+    --pre-text-color: #d0d0d0;
+
+    /* Borders.  A border sits a little above the surface it bounds, so that
+     * it reads as a line without being the brightest thing on the page. */
+    --border-color: #3c3c3c;
+    --table-border-color: #4a4a4a;
+
+    /* The search box, which is not on the page, and the notices that are */
+    --search-input-background-color: #2d2d2d;
+    --search-input-text-color: #d0d0d0;
+    --search-input-placeholder-color: #8a8a8a;
+    --search-tag-highlight-color: #6b6b1f;
+    --button-border-color: #4a4a4a;
+    --invalid-tag-background-color: #4a2626;
+    --invalid-tag-text-color: #f0d0d0;
+}
+
+/* The two colors javadoc's sheet names outright rather than through a
+ * variable. */
+hr {
+    border-color: #4a4a4a;
+}
+
+kbd {
+    background-color: #333333;
+    border-color: #4a4a4a;
+}
+
+/* ---- the specifications and the manual pages ----
+ *
+ * Their stylesheet leaves the page colors to the browser, which is white, so
+ * the dark page has to be stated here rather than mapped from anything.
+ */
+
+body {
+    background-color: #262626;
+    color: #d0d0d0;
+}
+
+a:link {
+    color: #6ab0f3;
+}
+
+/* Their sheet marks a visited link in a grey that nothing would read on a
+ * dark page.  javadoc's own pages make no distinction, so neither do we. */
+a:visited {
+    color: #6ab0f3;
+}
+
+a[href]:hover {
+    color: #e0a861;
+}
+
+table, th, td {
+    border-color: #4a4a4a;
+}
+
+tr:nth-child(even), tr:nth-child(even) th[scope=row] {
+    background: #2d2d2d;
+}
+
+tr:nth-child(odd), tr:nth-child(odd) th[scope=row] {
+    background: #262626;
+}
+
+th {
+    background: #33414e;
+}
+
+nav#TOC {
+    border-color: #4a4a4a;
+}
+
+/* A diagram drawn for a white page is given one to sit on rather than being
+ * left to blend into the dark background. */
+img {
+    background: #ffffff;
+}
